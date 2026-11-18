@@ -1,0 +1,36 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('nodes', function (Blueprint $table) {
+            $table->id();
+            $table->uuid('uuid')->unique();
+            $table->string('name');
+            $table->string('token_prefix', 16)->unique();
+            $table->string('token_hash', 64);
+            $table->string('hostname')->nullable();
+            $table->string('agent_version')->nullable();
+            $table->unsignedBigInteger('config_version')->nullable();
+            $table->string('config_hash', 64)->nullable();
+            $table->timestamp('last_seen_at')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('nodes');
+    }
+};

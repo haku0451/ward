@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ward
+      POSTGRES_USER: ward
+      POSTGRES_PASSWORD: ward
+    ports:
+      - "5433:5432"
+    volumes:
+      - ward-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ward -d ward"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  origin:
+    image: nginx:alpine
+    ports:
+      - "9080:80"
+
+  panel:
+    build:
+      context: ./ward-panel
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: Ward
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      APP_KEY: ${APP_KEY:-}
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ward
+      DB_USERNAME: ward
+      DB_PASSWORD: ward
+      SESSION_DRIVER: database
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      LOG_CHANNEL: stderr
+      WARD_AGENT_PANEL_URL: http://panel:8000
+      WARD_AGENT_DATA_DIR: /data
+      WARD_ADMIN_NAME: ${WARD_ADMIN_NAME:-Ward Admin}
+      WARD_ADMIN_EMAIL: ${WARD_ADMIN_EMAIL:-}
+      WARD_ADMIN_PASSWORD: ${WARD_ADMIN_PASSWORD:-}
+    volumes:
+      - ward-panel-storage:/var/www/html/storage
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "php",
+          "-r",
+          "exit(@file_get_contents('http://127.0.0.1:8000/up')===false?1:0);",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+  agent:
+    build:
+      context: ./ward-agent
+    depends_on:
+      - origin
+      - panel
+    ports:
+      - "8080:8080"
+    environment:
+      WARD_AGENT_TOKEN: ${WARD_AGENT_TOKEN:-}
+    volumes:
+      - ./ward-agent/configs/agent.docker.yaml:/etc/ward-agent/config.yaml:ro
+      - ward-agent-data:/data
+    command: ["--config", "/etc/ward-agent/config.yaml"]
+
+volumes:
+  ward-postgres:
+  ward-panel-storage:
+  ward-agent-data:
